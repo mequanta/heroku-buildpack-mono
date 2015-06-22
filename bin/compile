@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# bin/compile <build-dir> <cache-dir>
+
+set -e
+
+DEPENDENCY_S3_BUCKET_PATH="http://s3.amazonaws.com/mono-dependencies"
+MONO_VERSION="3.12.0"
+
+BUILD_DIR=$1
+CACHE_DIR=$2
+
+function conditional_download() {
+  DOWNLOAD_URL="$1"
+  DESTINATION="$2"
+
+  if [ ! -d ${DESTINATION} ]; then
+    rm -rf ${DESTINATION}
+    mkdir -p ${DESTINATION}
+    echo "-----> Downloading ${DOWNLOAD_URL}"
+    curl ${DOWNLOAD_URL} -s | tar xz -C ${DESTINATION}
+  fi
+}
+
+LP_DIR=`cd $(dirname $0); cd ..; pwd`
+cd ${BUILD_DIR}
+mkdir -p ${CACHE_DIR}
+
+MONO_CACHE_LOCATION=${CACHE_DIR}/$STACK/mono-${MONO_VERSION}
+conditional_download ${DEPENDENCY_S3_BUCKET_PATH}/${STACK}/mono-${MONO_VERSION}.tar.gz ${MONO_CACHE_LOCATION}
+
+# Copy mono from cache to where we're building the slug
+cp -r "${MONO_CACHE_LOCATION}/mono" .
+# Mono expects to be running out of /app
+ln -s "$BUILD_DIR/mono" /app
+
+# find a solution file
+SLN=$(find . -maxdepth 1 -iname "*.sln")
+if [ $( echo "${SLN}" | wc -l ) -gt 1 ]; then
+  echo "-----> Too many *.sln files"
+  exit 1
+fi
+
+if [ "${SLN}" == "" ]; then
+  echo "-----> No *.sln file found"
+  exit 1
+fi
+
+echo "-----> Compiling Mono application"
+
+export PATH="/app/mono/bin:${PATH}"
+export LD_LIBRARY_PATH="/app/mono/lib:${LD_LIBRARY_PATH}"
+
+# Add certs to trust store
+cp -r ${LP_DIR}/.config ~/.
+cp -r ${LP_DIR}/.config ${BUILD_DIR}/.
+
+BUILD_CACHE_LOCATION=${CACHE_DIR}/build/
+mkdir -p ${BUILD_CACHE_LOCATION}
+
+nuget restore -NonInteractive
+xbuild /property:Configuration=Release /property:OutDir=${BUILD_CACHE_LOCATION} ${SLN}
+
+cp -r ${BUILD_CACHE_LOCATION}* ${BUILD_DIR}
+
+mkdir -p ${BUILD_DIR}/.profile.d
+cp -n ${LP_DIR}/.profile.d/* ${BUILD_DIR}/.profile.d/
+
+echo "-----> Build SUCCESS"

@@ -1,0 +1,4 @@
+#!/bin/bash
+ROOT=`cd $(dirname $BASH_SOURCE)/.. && pwd`
+exec mono $ROOT/.nuget/NuGet.exe "$@"
+
