@@ -50,9 +50,10 @@ echo "-----> Compiling Mono application"
 export PATH="/app/mono/bin:${LP_DIR}/bin:${PATH}"
 export LD_LIBRARY_PATH="/app/mono/lib:${LD_LIBRARY_PATH}"
 
+mozroots --import --sync
 # Add certs to trust store
-cp -r ${LP_DIR}/.config ~/.
-cp -r ${LP_DIR}/.config ${BUILD_DIR}/.
+#cp -r ${LP_DIR}/.config ~/.
+#cp -r ${LP_DIR}/.config ${BUILD_DIR}/.
 
 BUILD_CACHE_LOCATION=${CACHE_DIR}/build/
 mkdir -p ${BUILD_CACHE_LOCATION}
